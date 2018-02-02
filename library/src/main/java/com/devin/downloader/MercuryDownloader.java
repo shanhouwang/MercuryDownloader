@@ -31,7 +31,9 @@ public class MercuryDownloader {
 
     private OnPauseListener mOnPauseListener;
 
-    private OnDownloaderListener mOnDownloaderListener;
+    private OnCompleteListener mOnDownloaderListener;
+
+    private OnErrorListener mOnErrorListener;
 
     private OnProgressListener mOnProgressListener;
 
@@ -48,10 +50,15 @@ public class MercuryDownloader {
         sp = new SPUtils("downloader.sp");
     }
 
-    public static MercuryDownloader url(String url) {
-        MercuryDownloader downloader = new MercuryDownloader();
-        downloader.url = url;
-        return downloader;
+    private MercuryDownloader() {}
+
+    public static MercuryDownloader build() {
+        return new MercuryDownloader();
+    }
+
+    public MercuryDownloader url(String url) {
+        this.url = url;
+        return this;
     }
 
     public MercuryDownloader activity(Activity activity) {
@@ -166,9 +173,14 @@ public class MercuryDownloader {
         return this;
     }
 
-    public void start(OnDownloaderListener onDownloader) {
+    public MercuryDownloader setOnCompleteListener(OnCompleteListener onDownloader) {
         this.mOnDownloaderListener = onDownloader;
-        download(url);
+        return this;
+    }
+
+    public MercuryDownloader setOnErrorListener(OnErrorListener listener) {
+        this.mOnErrorListener = listener;
+        return this;
     }
 
     public MercuryDownloader setOnProgressListener(OnProgressListener onProgress) {
@@ -181,10 +193,14 @@ public class MercuryDownloader {
         return this;
     }
 
+    public void start() {
+        download(url);
+    }
+
     /**
      * @param url 下载的Url
      */
-    public void download(final String url) {
+    private void download(final String url) {
         if (TextUtils.isEmpty(url)) {
             return;
         }
@@ -253,8 +269,8 @@ public class MercuryDownloader {
                 mOnProgressListener.onProgress(bean);
             }
             // 出现错误
-            if (null == bean) {
-                mOnDownloaderListener.onError();
+            if (null == bean && null != mOnErrorListener) {
+                mOnErrorListener.onError();
             }
         });
     }

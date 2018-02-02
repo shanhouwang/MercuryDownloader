@@ -5,9 +5,7 @@ package com.devin.downloader;
  *
  * @author Devin
  */
-public interface OnDownloaderListener {
+public interface OnCompleteListener {
 
     void onComplete(CallBackBean backBean);
-
-    void onError();
 }

@@ -21,7 +21,7 @@ import android.widget.TextView;
 
 import com.devin.downloader.CallBackBean;
 import com.devin.downloader.MercuryDownloader;
-import com.devin.downloader.OnDownloaderListener;
+import com.devin.downloader.OnCompleteListener;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -74,7 +74,8 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
             if (AppInfoDTO.PREPARE_DOWNLOAD == model.downloadStatus || AppInfoDTO.PAUSE_DOWNLOAD == model.downloadStatus) {
                 model.downloadStatus = AppInfoDTO.DOWNLOADING;
                 holder.layout_progressbar.setVisibility(View.VISIBLE);
-                MercuryDownloader.url(model.downloadUrl)
+                MercuryDownloader.build()
+                        .url(model.downloadUrl)
                         .activity(context)
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
@@ -85,23 +86,15 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                             model.downloadProgress = percent;
                             notifyItemChanged(position, R.id.tv_progress);
                         }))
-                        .start(new OnDownloaderListener() {
-                            @Override
-                            public void onComplete(final CallBackBean backBean) {
-                                mHandler.post(() -> {
-                                    model.downloadStatus = AppInfoDTO.DOWNLOADED;
-                                    model.localPath = backBean.path;
-                                    model.downloadProgress = 100;
-                                    holder.layout_progressbar.setVisibility(View.GONE);
-                                    context.startActivity(getIntent(backBean.path));
-                                    notifyItemChanged(position);
-                                });
-                            }
-
-                            @Override
-                            public void onError() {
-                            }
-                        });
+                        .setOnCompleteListener(backBean -> mHandler.post(() -> {
+                            model.downloadStatus = AppInfoDTO.DOWNLOADED;
+                            model.localPath = backBean.path;
+                            model.downloadProgress = 100;
+                            holder.layout_progressbar.setVisibility(View.GONE);
+                            context.startActivity(getIntent(backBean.path));
+                            notifyItemChanged(position);
+                        }))
+                        .start();
             } else if (model.downloadStatus == AppInfoDTO.DOWNLOADING) {
                 MercuryDownloader.pause(model.downloadUrl);
                 model.downloadStatus = AppInfoDTO.PAUSE_DOWNLOAD;
