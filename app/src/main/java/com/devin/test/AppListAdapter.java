@@ -76,6 +76,10 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 holder.layout_progressbar.setVisibility(View.VISIBLE);
                 MercuryDownloader.url(model.downloadUrl)
                         .activity(context)
+                        .setOnCancelListener(() -> {
+                            model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
+                            notifyItemChanged(position, R.id.tv_progress);
+                        })
                         .setOnProgressListener(bean -> mHandler.post(() -> {
                             int percent = (int) ((double) bean.progressLength / bean.contentLength * 100);
                             model.downloadProgress = percent;

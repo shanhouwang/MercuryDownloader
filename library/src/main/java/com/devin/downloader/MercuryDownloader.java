@@ -229,7 +229,11 @@ public class MercuryDownloader {
         new AlertDialog.Builder(mActivity)
                 .setTitle("继续下载？")
                 .setMessage("您的手机当前没有连接WIFI，现在下载会消耗您的手机流量，您确定要现在下载吗？")
-                .setNegativeButton("待会儿再说", (d, w) -> LogUtils.d("取消下载"))
+                .setNegativeButton("待会儿再说", (d, w) -> {
+                    if (null != mOnCancelListener) {
+                        mOnCancelListener.onCancel();
+                    }
+                })
                 .setPositiveButton("立即下载", (d, w) -> doIt(url, fileName))
                 .create()
                 .show();
