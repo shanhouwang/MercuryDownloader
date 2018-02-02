@@ -234,6 +234,7 @@ public class MercuryDownloader {
                         mOnCancelListener.onCancel();
                     }
                 })
+                .setCancelable(false)
                 .setPositiveButton("立即下载", (d, w) -> doIt(url, fileName))
                 .create()
                 .show();
