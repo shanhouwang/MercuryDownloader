@@ -21,7 +21,6 @@ import android.widget.TextView;
 
 import com.devin.downloader.CallBackBean;
 import com.devin.downloader.MercuryDownloader;
-import com.devin.downloader.OnCancelListener;
 import com.devin.downloader.OnDownloaderListener;
 
 import java.io.File;
