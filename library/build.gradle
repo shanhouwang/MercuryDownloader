@@ -1,4 +1,5 @@
 apply plugin: 'com.android.library'
+apply plugin: 'com.novoda.bintray-release'
 
 android {
     compileSdkVersion 26
@@ -22,10 +23,23 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
+    lintOptions {
+        abortOnError false
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'com.squareup.okhttp3:okhttp:3.9.0'
     implementation 'com.android.support:appcompat-v7:26.1.0'
+}
+
+// 添加
+publish {
+    userOrg = 'shanhouwang'
+    groupId = 'com.devin'
+    artifactId = 'downloader'
+    publishVersion = '0.0.1'
+    desc = 'a android breakpoint downloader'
+    website = 'https://github.com/shanhouwang/MercuryDownloader'
 }
