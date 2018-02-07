@@ -1,5 +1,5 @@
 # MercuryDownloader
-
+##  下载设置
 ```
 MercuryDownloader.build()
 	.url(model.downloadUrl)
@@ -22,6 +22,11 @@ MercuryDownloader.build()
 	    notifyItemChanged(position);
 	}))
 	.start();
+```
+## 暂停/取消一个下载
+
+```
+MercuryDownloader.pause(model.downloadUrl);
 ```
 
 
