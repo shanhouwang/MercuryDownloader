@@ -18,8 +18,7 @@ public class CommonUtils {
         if (TextUtils.isEmpty(url)) {
             return false;
         }
-        if ((url.startsWith("http://") || url.startsWith("https://"))
-                && url.endsWith(".apk")) {
+        if ((url.startsWith("http://") || url.startsWith("https://"))) {
             return true;
         }
         return false;

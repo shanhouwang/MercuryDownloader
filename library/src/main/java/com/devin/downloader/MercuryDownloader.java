@@ -3,6 +3,7 @@ package com.devin.downloader;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
@@ -21,11 +22,13 @@ public class MercuryDownloader {
 
     public static Context mContext;
 
-    public Activity mActivity;
+    private Activity mActivity;
 
     public static OkHttpClient mOkHttpClient;
 
     private String url;
+
+    private boolean isWarning = false;
 
     private OnResumeListener mOnResumeListener;
 
@@ -41,7 +44,7 @@ public class MercuryDownloader {
 
     public static SPUtils sp;
 
-    public String tag;
+    private String tag;
 
     public static void init(Context context, OkHttpClient client) {
         mContext = context;
@@ -163,6 +166,11 @@ public class MercuryDownloader {
         }
     }
 
+    public MercuryDownloader warningTip(boolean isWarning) {
+        this.isWarning = isWarning;
+        return this;
+    }
+
     public MercuryDownloader setOnResumeListener(OnResumeListener onResume) {
         this.mOnResumeListener = onResume;
         return this;
@@ -207,26 +215,30 @@ public class MercuryDownloader {
         if (!CommonUtils.isValidUrl(url)) {
             return;
         }
-        String path = sp.getString(CommonUtils.getFileName(url));
+        final String path = sp.getString(CommonUtils.getFileName(url));
         final String fileName = CommonUtils.getFileName(url);
         if (TextUtils.isEmpty(path)) {
-            showWarningDialog(url, fileName);
+            showWarningDialog(url, fileName, isWarning);
             return;
         }
 
-        final File apk = new File(path);
-        if (!apk.exists()) {
-            showWarningDialog(url, fileName);
+        final File f = new File(path);
+        if (!f.exists()) {
+            showWarningDialog(url, fileName, isWarning);
             return;
         }
-        DownloadUtils.getAsynFileLength(url, bean -> {
-            if (bean != null && (bean.contentLength == apk.length())) {
-                if (null != mOnDownloaderListener) {
-                    bean.path = path;
-                    mOnDownloaderListener.onComplete(bean);
+        DownloadUtils.getAsynFileLength(url, new DownloadUtils.DownloadCallBack() {
+
+            @Override
+            public void onResponse(CallBackBean bean) {
+                if (bean != null && (bean.contentLength == f.length())) {
+                    if (null != mOnDownloaderListener) {
+                        bean.path = path;
+                        mOnDownloaderListener.onComplete(bean);
+                    }
+                } else if (bean != null && (bean.contentLength != f.length())) {
+                    showWarningDialog(url, fileName, isWarning);
                 }
-            } else if (bean != null && (bean.contentLength != apk.length())) {
-                showWarningDialog(url, fileName);
             }
         });
     }
@@ -237,7 +249,11 @@ public class MercuryDownloader {
      * @param url
      * @param fileName
      */
-    private void showWarningDialog(final String url, final String fileName) {
+    private void showWarningDialog(final String url, final String fileName, boolean isWarning) {
+        if (!isWarning) {
+            doIt(url, fileName);
+            return;
+        }
         if (NetworkUtils.isWifi()) {
             doIt(url, fileName);
             return;
@@ -245,32 +261,45 @@ public class MercuryDownloader {
         new AlertDialog.Builder(mActivity)
                 .setTitle("继续下载？")
                 .setMessage("您的手机当前没有连接WIFI，现在下载会消耗您的手机流量，您确定要现在下载吗？")
-                .setNegativeButton("待会儿再说", (d, w) -> {
-                    if (null != mOnCancelListener) {
-                        mOnCancelListener.onCancel();
+                .setNegativeButton("待会儿再说", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        if (null != mOnCancelListener) {
+                            mOnCancelListener.onCancel();
+                        }
                     }
                 })
                 .setCancelable(false)
-                .setPositiveButton("立即下载", (d, w) -> doIt(url, fileName))
+                .setPositiveButton("立即下载", new DialogInterface.OnClickListener() {
+
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        doIt(url, fileName);
+                    }
+                })
                 .create()
                 .show();
     }
 
-    private void doIt(String url, String fileName) {
+    private void doIt(final String url, String fileName) {
         CallBackBean bp = sp.getObject(url);
-        DownloadUtils.downAsynFile(url, tag, fileName, true, bp, bean -> {
-            // 下载完成
-            if (bean.contentLength == bean.progressLength && null != mOnDownloaderListener) {
-                mOnDownloaderListener.onComplete(bean);
-                sp.putString(CommonUtils.getFileName(url), bean.path);
-            }
-            // 正在下载
-            if (bean.contentLength >= bean.progressLength && null != mOnProgressListener) {
-                mOnProgressListener.onProgress(bean);
-            }
-            // 出现错误
-            if (null == bean && null != mOnErrorListener) {
-                mOnErrorListener.onError();
+        DownloadUtils.downAsynFile(url, tag, fileName, true, bp, new DownloadUtils.DownloadCallBack() {
+
+            @Override
+            public void onResponse(CallBackBean bean) {
+                // 下载完成
+                if (bean.contentLength == bean.progressLength && null != mOnDownloaderListener) {
+                    mOnDownloaderListener.onComplete(bean);
+                    sp.putString(CommonUtils.getFileName(url), bean.path);
+                }
+                // 正在下载
+                if (bean.contentLength >= bean.progressLength && null != mOnProgressListener) {
+                    mOnProgressListener.onProgress(bean);
+                }
+                // 出现错误
+                if (null == bean && null != mOnErrorListener) {
+                    mOnErrorListener.onError();
+                }
             }
         });
     }

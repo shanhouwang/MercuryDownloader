@@ -60,7 +60,7 @@ public class DownloadUtils {
         request(url, fileName, progress, breakPoint, callBack, request);
     }
 
-    private static void request(String url, String fileName, boolean progress, CallBackBean breakPoint, DownloadCallBack callBack, Request request) {
+    private static void request(final String url, final String fileName, final boolean progress, final CallBackBean breakPoint, final DownloadCallBack callBack, Request request) {
         MercuryDownloader.mOkHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
