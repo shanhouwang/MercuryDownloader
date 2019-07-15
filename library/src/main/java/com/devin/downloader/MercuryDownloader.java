@@ -46,6 +46,8 @@ public class MercuryDownloader {
 
     private String tag;
 
+    private boolean cache = true;
+
     public static void init(Context context, OkHttpClient client) {
         mContext = context;
         mOkHttpClient = client;
@@ -166,6 +168,11 @@ public class MercuryDownloader {
         }
     }
 
+    public MercuryDownloader cache(boolean cache) {
+        this.cache = cache;
+        return this;
+    }
+
     public MercuryDownloader warningTip(boolean isWarning) {
         this.isWarning = isWarning;
         return this;
@@ -218,13 +225,17 @@ public class MercuryDownloader {
         final String path = sp.getString(CommonUtils.getFileName(url));
         final String fileName = CommonUtils.getFileName(url);
         if (TextUtils.isEmpty(path)) {
-            showWarningDialog(url, fileName, isWarning);
+            showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
         }
-
         final File f = new File(path);
         if (!f.exists()) {
-            showWarningDialog(url, fileName, isWarning);
+            showWarningDialogAndDownloadIt(url, fileName, isWarning);
+            return;
+        }
+        if (!cache) {
+            f.delete();
+            showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
         }
         DownloadUtils.getAsynFileLength(url, new DownloadUtils.DownloadCallBack() {
@@ -237,7 +248,7 @@ public class MercuryDownloader {
                         mOnDownloaderListener.onComplete(bean);
                     }
                 } else if (bean != null && (bean.contentLength != f.length())) {
-                    showWarningDialog(url, fileName, isWarning);
+                    showWarningDialogAndDownloadIt(url, fileName, isWarning);
                 }
             }
         });
@@ -249,7 +260,7 @@ public class MercuryDownloader {
      * @param url
      * @param fileName
      */
-    private void showWarningDialog(final String url, final String fileName, boolean isWarning) {
+    private void showWarningDialogAndDownloadIt(final String url, final String fileName, boolean isWarning) {
         if (!isWarning) {
             doIt(url, fileName);
             return;
@@ -283,6 +294,10 @@ public class MercuryDownloader {
 
     private void doIt(final String url, String fileName) {
         CallBackBean bp = sp.getObject(url);
+        File file = new File(bp.path);
+        if (!file.exists()) {
+            bp = null;
+        }
         DownloadUtils.downAsynFile(url, tag, fileName, true, bp, new DownloadUtils.DownloadCallBack() {
 
             @Override

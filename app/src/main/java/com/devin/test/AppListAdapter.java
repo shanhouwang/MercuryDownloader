@@ -77,6 +77,7 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 MercuryDownloader.build()
                         .url(model.downloadUrl)
                         .activity(context)
+                        .cache(false)
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
                             notifyItemChanged(position, R.id.tv_progress);

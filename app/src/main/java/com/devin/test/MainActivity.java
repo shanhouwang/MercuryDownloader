@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
         mOkHttpClient = new OkHttpClient.Builder()
                 .connectTimeout(30000L, TimeUnit.MILLISECONDS)
                 .readTimeout(30000L, TimeUnit.MILLISECONDS)
-//                .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
+                // .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
                 .build();
         MercuryDownloader.init(this, mOkHttpClient);
 
