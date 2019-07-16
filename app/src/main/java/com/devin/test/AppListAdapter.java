@@ -19,9 +19,7 @@ import android.widget.ProgressBar;
 import android.widget.RatingBar;
 import android.widget.TextView;
 
-import com.devin.downloader.CallBackBean;
 import com.devin.downloader.MercuryDownloader;
-import com.devin.downloader.OnCompleteListener;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -77,7 +75,7 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 MercuryDownloader.build()
                         .url(model.downloadUrl)
                         .activity(context)
-                        .cache(false)
+                        .useCache(false)
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
                             notifyItemChanged(position, R.id.tv_progress);

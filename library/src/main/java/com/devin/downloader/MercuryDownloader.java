@@ -46,7 +46,8 @@ public class MercuryDownloader {
 
     private String tag;
 
-    private boolean cache = true;
+    // 默认使用缓存（断点下载）
+    private boolean useCache = true;
 
     public static void init(Context context, OkHttpClient client) {
         mContext = context;
@@ -168,8 +169,8 @@ public class MercuryDownloader {
         }
     }
 
-    public MercuryDownloader cache(boolean cache) {
-        this.cache = cache;
+    public MercuryDownloader useCache(boolean cache) {
+        this.useCache = cache;
         return this;
     }
 
@@ -233,7 +234,7 @@ public class MercuryDownloader {
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
         }
-        if (!cache) {
+        if (!useCache) {
             f.delete();
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
@@ -294,9 +295,11 @@ public class MercuryDownloader {
 
     private void doIt(final String url, String fileName) {
         CallBackBean bp = sp.getObject(url);
-        File file = new File(bp.path);
-        if (!file.exists()) {
-            bp = null;
+        if (bp != null) {
+            File file = new File(bp.path);
+            if (!file.exists() && !useCache) {
+                bp = null;
+            }
         }
         DownloadUtils.downAsynFile(url, tag, fileName, true, bp, new DownloadUtils.DownloadCallBack() {
 
