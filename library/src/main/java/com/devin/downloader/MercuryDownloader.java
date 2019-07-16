@@ -235,6 +235,7 @@ public class MercuryDownloader {
             return;
         }
         if (!useCache) {
+            // 删除本地文件（不使用缓存）
             f.delete();
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
@@ -249,6 +250,8 @@ public class MercuryDownloader {
                         mOnDownloaderListener.onComplete(bean);
                     }
                 } else if (bean != null && (bean.contentLength != f.length())) {
+                    // 删除本地缓存（服务器文件和本地文件大小不一致）
+                    f.delete();
                     showWarningDialogAndDownloadIt(url, fileName, isWarning);
                 }
             }
@@ -295,11 +298,13 @@ public class MercuryDownloader {
 
     private void doIt(final String url, String fileName) {
         CallBackBean bp = sp.getObject(url);
-        if (bp != null) {
+        if (useCache && bp != null) {
             File file = new File(bp.path);
-            if (!file.exists() && !useCache) {
+            if (!file.exists()) {
                 bp = null;
             }
+        } else {
+            bp = null;
         }
         DownloadUtils.downAsynFile(url, tag, fileName, true, bp, new DownloadUtils.DownloadCallBack() {
 
