@@ -250,8 +250,6 @@ public class MercuryDownloader {
                         mOnDownloaderListener.onComplete(bean);
                     }
                 } else if (bean != null && (bean.contentLength != f.length())) {
-                    // 删除本地缓存（服务器文件和本地文件大小不一致）
-                    f.delete();
                     showWarningDialogAndDownloadIt(url, fileName, isWarning);
                 }
             }
@@ -275,7 +273,7 @@ public class MercuryDownloader {
         }
         new AlertDialog.Builder(mActivity)
                 .setTitle("继续下载？")
-                .setMessage("您的手机当前没有连接WIFI，现在下载会消耗您的手机流量，您确定要现在下载吗？")
+                .setMessage("您的手机当前没有连接Wifi，现在下载会消耗您的手机流量，您确定要现在下载吗？")
                 .setNegativeButton("待会儿再说", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
