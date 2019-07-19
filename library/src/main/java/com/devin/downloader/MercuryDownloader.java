@@ -28,6 +28,8 @@ public class MercuryDownloader {
 
     private String url;
 
+    private String fileName;
+
     private boolean isWarning = false;
 
     private OnResumeListener mOnResumeListener;
@@ -64,6 +66,11 @@ public class MercuryDownloader {
 
     public MercuryDownloader url(String url) {
         this.url = url;
+        return this;
+    }
+
+    public MercuryDownloader fileName(String fileName) {
+        this.fileName = fileName;
         return this;
     }
 
@@ -223,8 +230,8 @@ public class MercuryDownloader {
         if (!CommonUtils.isValidUrl(url)) {
             return;
         }
-        final String path = sp.getString(CommonUtils.getFileName(url));
-        final String fileName = CommonUtils.getFileName(url);
+        final String fileName = TextUtils.isEmpty(this.fileName) ? CommonUtils.getFileName(url) : this.fileName;
+        final String path = sp.getString(fileName);
         if (TextUtils.isEmpty(path)) {
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;

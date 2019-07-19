@@ -75,7 +75,7 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 MercuryDownloader.build()
                         .url(model.downloadUrl)
                         .activity(context)
-                        .useCache(false)
+                        .fileName(position + ".apk")
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
                             notifyItemChanged(position, R.id.tv_progress);
@@ -169,7 +169,7 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
         Intent intent = new Intent(Intent.ACTION_VIEW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            Uri contentUri = FileProvider.getUriForFile(context, "com.devin.app.store.FileProvider", new File(path));
+            Uri contentUri = FileProvider.getUriForFile(context, "com.devin.downloader.FileProvider", new File(path));
             intent.setDataAndType(contentUri, "application/vnd.android.package-archive");
         } else {
             intent.setDataAndType(Uri.fromFile(new File(path)), "application/vnd.android.package-archive");
