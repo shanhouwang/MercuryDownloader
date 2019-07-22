@@ -7,6 +7,7 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
+import android.util.SparseArray;
 
 import java.io.File;
 
@@ -19,6 +20,12 @@ import okhttp3.OkHttpClient;
  * @author Devin
  */
 public class MercuryDownloader {
+
+    private static final int NUM_THREADS = 5;
+
+    private static final int NUM_DEFAULT_THREAD = 1;
+
+    private volatile SparseArray<PartCallBackBean> progressArray = new SparseArray<>();
 
     public static Context mContext;
 
@@ -51,6 +58,9 @@ public class MercuryDownloader {
     // 默认使用缓存（断点下载）
     private boolean useCache = true;
 
+    // 是否使用多线程
+    private boolean useMultiThread = false;
+
     public static void init(Context context, OkHttpClient client) {
         mContext = context;
         mOkHttpClient = client;
@@ -58,7 +68,8 @@ public class MercuryDownloader {
         sp = new SPUtils("downloader.sp");
     }
 
-    private MercuryDownloader() {}
+    private MercuryDownloader() {
+    }
 
     public static MercuryDownloader build() {
         return new MercuryDownloader();
@@ -176,6 +187,11 @@ public class MercuryDownloader {
         }
     }
 
+    public MercuryDownloader useMultiThread(boolean useMultiThread) {
+        this.useMultiThread = useMultiThread;
+        return this;
+    }
+
     public MercuryDownloader useCache(boolean cache) {
         this.useCache = cache;
         return this;
@@ -230,7 +246,7 @@ public class MercuryDownloader {
         if (!CommonUtils.isValidUrl(url)) {
             return;
         }
-        final String fileName = TextUtils.isEmpty(this.fileName) ? CommonUtils.getFileName(url) : this.fileName;
+        fileName = TextUtils.isEmpty(this.fileName) ? CommonUtils.getFileName(url) : this.fileName;
         final String path = sp.getString(fileName);
         if (TextUtils.isEmpty(path)) {
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
@@ -247,14 +263,15 @@ public class MercuryDownloader {
             showWarningDialogAndDownloadIt(url, fileName, isWarning);
             return;
         }
-        DownloadUtils.getAsynFileLength(url, new DownloadUtils.DownloadCallBack() {
+        DownloadUtils.getAsyncFileLength(url, new DownloadUtils.DownloadCallBack() {
 
             @Override
-            public void onResponse(CallBackBean bean) {
+            public void onResponse(PartCallBackBean bean) {
                 if (bean != null && (bean.contentLength == f.length())) {
                     if (null != mOnDownloaderListener) {
-                        bean.path = path;
-                        mOnDownloaderListener.onComplete(bean);
+                        CallBackBean data = new CallBackBean();
+                        data.path = path;
+                        mOnDownloaderListener.onComplete(data);
                     }
                 } else if (bean != null && (bean.contentLength != f.length())) {
                     showWarningDialogAndDownloadIt(url, fileName, isWarning);
@@ -301,34 +318,89 @@ public class MercuryDownloader {
                 .show();
     }
 
-    private void doIt(final String url, String fileName) {
-        CallBackBean bp = sp.getObject(url);
-        if (useCache && bp != null) {
-            File file = new File(bp.path);
-            if (!file.exists()) {
-                bp = null;
+    private void doIt(final String url, final String fileName) {
+        SparseArray<PartCallBackBean> parts = sp.getObject(url);
+        if (useCache) {
+            if (parts != null) {
+                PartCallBackBean part = parts.get(0);
+                File file = new File(part.path);
+                if (!file.exists()) {
+                    parts = null;
+                }
             }
         } else {
-            bp = null;
+            parts = null;
         }
-        DownloadUtils.downAsynFile(url, tag, fileName, true, bp, new DownloadUtils.DownloadCallBack() {
+        final SparseArray<PartCallBackBean> catchParts = parts;
+        if (useMultiThread) {
+            DownloadUtils.getAsyncFileLength(url, new DownloadUtils.DownloadCallBack() {
+                @Override
+                public void onResponse(PartCallBackBean bean) {
+                    if (bean != null) {
+                        long blockSize = bean.contentLength / NUM_THREADS;
+                        for (int i = 0; i < NUM_THREADS; i++) {
+                            long endPoint = (i + 1) != NUM_THREADS ? (i + 1) * blockSize : bean.contentLength;
+                            PartCallBackBean part;
+                            if (catchParts == null || catchParts.get(i) == null) {
+                                part = new PartCallBackBean();
+                                part.startPoint = i * blockSize;
+                                part.endPoint = endPoint;
+                            } else {
+                                part = catchParts.get(i);
+                            }
+                            async(part, url, fileName);
+                        }
+                    }
+                }
+            });
+        } else {
+            async(catchParts == null ? null : catchParts.get(0), url, fileName);
+        }
+    }
+
+    private void async(PartCallBackBean bean, String url, String fileName) {
+        DownAsyncFileBean b = new DownAsyncFileBean();
+        b.url = url;
+        b.tag = tag;
+        b.fileName = fileName;
+        b.progress = true;
+        b.breakPoint = bean;
+        b.contentLength = bean == null ? 0 : bean.contentLength;
+        DownloadUtils.downAsyncFile(b, new DownloadUtils.DownloadCallBack() {
 
             @Override
-            public void onResponse(CallBackBean bean) {
-                // 下载完成
-                if (bean.contentLength == bean.progressLength && null != mOnDownloaderListener) {
-                    mOnDownloaderListener.onComplete(bean);
-                    sp.putString(TextUtils.isEmpty(MercuryDownloader.this.fileName) ? CommonUtils.getFileName(url) : MercuryDownloader.this.fileName, bean.path);
-                }
-                // 正在下载
-                if (bean.contentLength >= bean.progressLength && null != mOnProgressListener) {
-                    mOnProgressListener.onProgress(bean);
-                }
-                // 出现错误
-                if (null == bean && null != mOnErrorListener) {
-                    mOnErrorListener.onError();
-                }
+            public void onResponse(PartCallBackBean bean) {
+                map(bean);
             }
         });
+    }
+
+    private void map(PartCallBackBean partBean) {
+        progressArray.put(partBean.index, partBean);
+        CallBackBean backBean = new CallBackBean();
+        backBean.path = partBean.path;
+        backBean.contentLength = partBean.contentLength;
+        for (int i = 0; i < (useMultiThread ? NUM_THREADS : NUM_DEFAULT_THREAD); i++) {
+            PartCallBackBean temp = progressArray.get(i);
+            if (temp == null) {
+                continue;
+            }
+            backBean.progressLength += temp.progressLength;
+        }
+        // 下载完成
+        if (null != mOnDownloaderListener && backBean.contentLength == backBean.progressLength) {
+            mOnDownloaderListener.onComplete(backBean);
+            sp.putString(MercuryDownloader.this.fileName, backBean.path);
+            sp.putObject(url, progressArray);
+        }
+        // 正在下载
+        if (null != mOnProgressListener && backBean.contentLength >= backBean.progressLength) {
+            mOnProgressListener.onProgress(backBean);
+            sp.putObject(url, progressArray);
+        }
+        // 出现错误
+        if (null == backBean && null != mOnErrorListener) {
+            mOnErrorListener.onError();
+        }
     }
 }

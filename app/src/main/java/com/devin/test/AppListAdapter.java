@@ -74,8 +74,9 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 holder.layout_progressbar.setVisibility(View.VISIBLE);
                 MercuryDownloader.build()
                         .url(model.downloadUrl)
+                        .useCache(false)
                         .activity(context)
-                        .fileName(position + ".apk")
+                        .useMultiThread(true)
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
                             notifyItemChanged(position, R.id.tv_progress);

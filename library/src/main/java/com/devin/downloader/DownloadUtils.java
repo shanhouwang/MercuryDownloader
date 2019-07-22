@@ -1,9 +1,6 @@
 package com.devin.downloader;
 
-import android.system.OsConstants;
-
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -24,43 +21,38 @@ public class DownloadUtils {
 
     public static List<String> requestUrls = new ArrayList<>();
 
-    public static final String TAG = DownloadUtils.class.getSimpleName();
-
     /**
      * 下载文件
      *
-     * @param url        地址
-     * @param tag        请求标记
-     * @param fileName   文件名称
-     * @param progress   进度
-     * @param breakPoint 是否断点下载
-     * @param callBack   回调
+     * @param bean     参数包装类
+     * @param callBack 回调
      */
-    public static void downAsynFile(final String url, String tag, final String fileName, boolean progress, CallBackBean breakPoint, final DownloadCallBack callBack) {
+    public static void downAsyncFile(final DownAsyncFileBean bean, final DownloadCallBack callBack) {
         // 多次请求只允许一次
         synchronized (requestUrls) {
-            if (requestUrls.contains(url)) {
+            if (requestUrls.contains(bean.url)) {
                 return;
             }
-            requestUrls.add(url);
+            requestUrls.add(bean.url);
         }
         Request request;
-        if (null != breakPoint && breakPoint.progressLength != 0) {
+        if (null != bean.breakPoint && bean.breakPoint.progressLength != 0) {
             request = new Request.Builder()
-                    .addHeader("RANGE", "bytes=" + breakPoint.progressLength + "-" + breakPoint.contentLength)
-                    .url(url)
-                    .tag(tag)
+                    .addHeader("RANGE", "bytes=" + bean.breakPoint.startPoint + "-" + bean.breakPoint.endPoint)
+                    .url(bean.url)
+                    .tag(bean.tag)
                     .build();
         } else {
             request = new Request.Builder()
-                    .url(url)
-                    .tag(tag)
+                    .url(bean.url)
+                    .tag(bean.tag)
                     .build();
         }
-        request(url, fileName, progress, breakPoint, callBack, request);
+        request(bean, callBack, request);
     }
 
-    private static void request(final String url, final String fileName, final boolean progress, final CallBackBean breakPoint, final DownloadCallBack callBack, Request request) {
+    private static void request(final DownAsyncFileBean data, final DownloadCallBack callBack, Request request) {
+
         MercuryDownloader.mOkHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -71,51 +63,47 @@ public class DownloadUtils {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
+                assert response.body() != null;
                 InputStream inputStream = response.body().byteStream();
-                long contentLength = null != breakPoint ? breakPoint.contentLength : response.body().contentLength();
+                long contentLength = null != data.breakPoint ? data.breakPoint.contentLength : response.body().contentLength();
                 RandomAccessFile randomAccessFile;
-                String localPath = getLocalFilePath(fileName);
-                CallBackBean bean = null;
+                String localPath = getLocalFilePath(data.fileName);
+                PartCallBackBean bean;
                 try {
-                    long total = 0;
                     randomAccessFile = new RandomAccessFile(localPath, "rwd");
-                    if (null != breakPoint && breakPoint.progressLength > 0) {
-                        randomAccessFile.seek(breakPoint.progressLength);
-                        total = breakPoint.progressLength;
+                    if (null != data.breakPoint) {
+                        // 设置从什么位置开始写入数据
+                        randomAccessFile.seek(data.breakPoint.startPoint);
                     }
-                    byte[] buffer = new byte[1024 * 1024];
+                    byte[] buffer = new byte[1024];
                     int len;
+                    int progressLength = 0;
                     while ((len = inputStream.read(buffer)) != -1) {
                         randomAccessFile.write(buffer, 0, len);
-                        if (progress) {
-                            total += len;
-                            if (callBack != null) {
-                                bean = new CallBackBean();
-                                bean.path = localPath;
-                                bean.isNeedProgress = progress;
-                                bean.contentLength = contentLength;
-                                bean.progressLength = total;
-                                callBack.onResponse(bean);
-                            }
-
-                            // 断点下载 记录 已下载大小
-                            MercuryDownloader.sp.putObject(url, bean);
+                        progressLength += len;
+                        if (callBack != null) {
+                            bean = new PartCallBackBean();
+                            bean.path = localPath;
+                            bean.isNeedProgress = data.progress;
+                            bean.contentLength = contentLength;
+                            bean.progressLength = progressLength;
+                            callBack.onResponse(bean);
                         }
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
                     // 发生了异常要Remove
-                    requestUrls.remove(url);
+                    requestUrls.remove(data.url);
                 }
                 LogUtils.d(">>>>>localPath:" + localPath);
-                if (callBack != null && !progress) {
-                    bean = new CallBackBean();
+                if (callBack != null && !data.progress) {
+                    bean = new PartCallBackBean();
                     bean.path = localPath;
-                    bean.isNeedProgress = progress;
+                    bean.isNeedProgress = data.progress;
                     callBack.onResponse(bean);
                 }
                 // 下载完了删除此Url
-                requestUrls.remove(url);
+                requestUrls.remove(data.url);
             }
         });
     }
@@ -126,7 +114,7 @@ public class DownloadUtils {
      * @param url
      * @param callBack
      */
-    public static void getAsynFileLength(final String url, final DownloadCallBack callBack) {
+    public static void getAsyncFileLength(final String url, final DownloadCallBack callBack) {
         Request request = new Request.Builder().url(url).build();
         MercuryDownloader.mOkHttpClient.newCall(request).enqueue(new Callback() {
             @Override
@@ -139,7 +127,7 @@ public class DownloadUtils {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 if (callBack != null) {
-                    CallBackBean bean = new CallBackBean();
+                    PartCallBackBean bean = new PartCallBackBean();
                     bean.path = getLocalFilePath(url);
                     bean.contentLength = (int) response.body().contentLength();
                     callBack.onResponse(bean);
@@ -165,7 +153,7 @@ public class DownloadUtils {
          *
          * @param bean
          */
-        void onResponse(CallBackBean bean);
+        void onResponse(PartCallBackBean bean);
     }
 
 }
