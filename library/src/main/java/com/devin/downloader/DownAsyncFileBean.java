@@ -14,7 +14,7 @@ public class DownAsyncFileBean implements Serializable {
 
     public PartCallBackBean breakPoint;
 
-    public int index;
+    public int index = 0;
 
     public boolean useMultiThread;
 

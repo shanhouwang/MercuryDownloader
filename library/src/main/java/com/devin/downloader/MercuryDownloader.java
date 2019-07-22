@@ -343,6 +343,7 @@ public class MercuryDownloader {
                             PartCallBackBean part;
                             if (catchParts == null || catchParts.get(i) == null) {
                                 part = new PartCallBackBean();
+                                part.index = i;
                                 part.startPoint = i * blockSize;
                                 part.endPoint = endPoint;
                             } else {

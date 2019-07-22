@@ -41,4 +41,17 @@ public class PartCallBackBean implements Serializable {
      * Part索引
      */
     public int index;
+
+    @Override
+    public String toString() {
+        return "PartCallBackBean{" +
+                "path='" + path + '\'' +
+                ", isNeedProgress=" + isNeedProgress +
+                ", contentLength=" + contentLength +
+                ", progressLength=" + progressLength +
+                ", startPoint=" + startPoint +
+                ", endPoint=" + endPoint +
+                ", index=" + index +
+                '}';
+    }
 }

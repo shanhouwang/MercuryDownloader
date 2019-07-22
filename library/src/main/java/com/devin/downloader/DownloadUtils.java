@@ -19,8 +19,6 @@ import okhttp3.Response;
  */
 public class DownloadUtils {
 
-    public static List<String> requestUrls = new ArrayList<>();
-
     /**
      * 下载文件
      *
@@ -28,15 +26,8 @@ public class DownloadUtils {
      * @param callBack 回调
      */
     public static void downAsyncFile(final DownAsyncFileBean bean, final DownloadCallBack callBack) {
-        // 多次请求只允许一次
-        synchronized (requestUrls) {
-            if (requestUrls.contains(bean.url)) {
-                return;
-            }
-            requestUrls.add(bean.url);
-        }
         Request request;
-        if (null != bean.breakPoint && bean.breakPoint.progressLength != 0) {
+        if (null != bean.breakPoint && bean.breakPoint.endPoint != 0) {
             request = new Request.Builder()
                     .addHeader("RANGE", "bytes=" + bean.breakPoint.startPoint + "-" + bean.breakPoint.endPoint)
                     .url(bean.url)
@@ -68,7 +59,7 @@ public class DownloadUtils {
                 long contentLength = null != data.breakPoint ? data.breakPoint.contentLength : response.body().contentLength();
                 RandomAccessFile randomAccessFile;
                 String localPath = getLocalFilePath(data.fileName);
-                PartCallBackBean bean;
+                PartCallBackBean bean = null;
                 try {
                     randomAccessFile = new RandomAccessFile(localPath, "rwd");
                     if (null != data.breakPoint) {
@@ -89,21 +80,13 @@ public class DownloadUtils {
                             bean.progressLength = progressLength;
                             callBack.onResponse(bean);
                         }
+                        assert bean != null;
+                        LogUtils.d(">>>>>breakPoint: " + Thread.currentThread().getId() + ", " + data.breakPoint.toString());
+                        LogUtils.d(">>>>>" + Thread.currentThread().getId() + ", " + bean.toString());
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
-                    // 发生了异常要Remove
-                    requestUrls.remove(data.url);
                 }
-                LogUtils.d(">>>>>localPath:" + localPath);
-                if (callBack != null && !data.progress) {
-                    bean = new PartCallBackBean();
-                    bean.path = localPath;
-                    bean.isNeedProgress = data.progress;
-                    callBack.onResponse(bean);
-                }
-                // 下载完了删除此Url
-                requestUrls.remove(data.url);
             }
         });
     }
@@ -129,7 +112,8 @@ public class DownloadUtils {
                 if (callBack != null) {
                     PartCallBackBean bean = new PartCallBackBean();
                     bean.path = getLocalFilePath(url);
-                    bean.contentLength = (int) response.body().contentLength();
+                    assert response.body() != null;
+                    bean.contentLength = response.body().contentLength();
                     callBack.onResponse(bean);
                 }
             }
