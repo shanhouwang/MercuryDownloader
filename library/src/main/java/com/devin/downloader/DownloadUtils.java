@@ -154,7 +154,7 @@ public class DownloadUtils {
      * @param fileName
      * @return
      */
-    private static String getLocalFilePath(String fileName) {
+    public static String getLocalFilePath(String fileName) {
         return MercuryDownloader.mContext.getExternalCacheDir().getAbsolutePath() + File.separator + fileName;
     }
 

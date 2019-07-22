@@ -318,7 +318,7 @@ public class MercuryDownloader {
                 // 下载完成
                 if (bean.contentLength == bean.progressLength && null != mOnDownloaderListener) {
                     mOnDownloaderListener.onComplete(bean);
-                    sp.putString(CommonUtils.getFileName(url), bean.path);
+                    sp.putString(TextUtils.isEmpty(MercuryDownloader.this.fileName) ? CommonUtils.getFileName(url) : MercuryDownloader.this.fileName, bean.path);
                 }
                 // 正在下载
                 if (bean.contentLength >= bean.progressLength && null != mOnProgressListener) {
