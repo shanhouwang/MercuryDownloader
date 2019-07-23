@@ -9,8 +9,11 @@ import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -30,6 +33,11 @@ public class MercuryDownloader {
     private static final int DEFAULT_NUM_THREAD = 1;
 
     private Map<Integer, PartCallBackBean> progressMap = new Hashtable<>();
+
+    private static final Map<String, List<Future>> futuresMap = new Hashtable<>();
+
+    // 定时任务，定时刷新Ui
+    private static final Map<String, ScheduledFuture> progressFutureMap = new Hashtable<>();
 
     public static Context mContext;
 
@@ -62,9 +70,6 @@ public class MercuryDownloader {
 
     // 是否使用多线程
     private boolean useMultiThread = false;
-
-    // 定时任务，定时刷新Ui
-    private ScheduledFuture future;
 
     private CallBackBean mCallBackBean = new CallBackBean();
 
@@ -179,6 +184,33 @@ public class MercuryDownloader {
     }
 
     /**
+     * pause download request
+     *
+     * @param url
+     */
+    public static void pause(String url) {
+        if (TextUtils.isEmpty(url)) {
+            return;
+        }
+        List<Future> futures = futuresMap.get(url);
+        if (null == futures || futures.size() <= 0) {
+            return;
+        }
+        for (Future f : futures) {
+            f.cancel(true);
+        }
+        futures.clear();
+        futuresMap.remove(url);
+
+        ScheduledFuture progressFuture = progressFutureMap.get(url);
+        if (null == progressFuture) {
+            return;
+        }
+        progressFuture.cancel(true);
+        progressFutureMap.remove(url);
+    }
+
+    /**
      * @param url 下载的Url
      */
     private void download(final String url) {
@@ -186,6 +218,11 @@ public class MercuryDownloader {
             return;
         }
         if (!CommonUtils.isValidUrl(url)) {
+            return;
+        }
+        List<Future> futures = futuresMap.get(url);
+        if (futures != null && futures.size() > 0) {
+            // 说明正在下载中
             return;
         }
         fileName = TextUtils.isEmpty(this.fileName) ? CommonUtils.getFileName(url) : this.fileName;
@@ -274,6 +311,7 @@ public class MercuryDownloader {
             parts = null;
         }
         final Map<Integer, PartCallBackBean> catchParts = parts;
+        final List<Future> futures = new ArrayList<>();
         if (useMultiThread) {
             DownloadUtils.getAsyncFileLength(url, new DownloadUtils.DownloadCallBack() {
                 @Override
@@ -292,25 +330,25 @@ public class MercuryDownloader {
                             } else {
                                 part = catchParts.get(i);
                             }
-                            async(part, url, fileName);
+                            futures.add(async(part, url, fileName));
                         }
                     }
                 }
             });
         } else {
-            async(catchParts == null ? null : catchParts.get(0), url, fileName);
+            futures.add(async(catchParts == null ? null : catchParts.get(0), url, fileName));
         }
-
-        future = ThreadUtils.get(ThreadUtils.Type.SCHEDULED)
+        futuresMap.put(url, futures);
+        progressFutureMap.put(url, ThreadUtils.get(ThreadUtils.Type.SCHEDULED)
                 .scheduleWithFixedDelay(new Runnable() {
                     @Override
                     public void run() {
                         map();
                     }
-                }, 0, 1000, TimeUnit.MILLISECONDS);
+                }, 0, 1000, TimeUnit.MILLISECONDS));
     }
 
-    private void async(PartCallBackBean bean, String url, String fileName) {
+    private Future async(PartCallBackBean bean, String url, String fileName) {
         final DownAsyncFileBean b = new DownAsyncFileBean();
         b.url = url;
         b.tag = tag;
@@ -318,7 +356,7 @@ public class MercuryDownloader {
         b.progress = true;
         b.breakPoint = bean;
         b.contentLength = bean == null ? 0 : bean.contentLength;
-        DownloadUtils.downAsyncFile(b, new DownloadUtils.DownloadCallBack() {
+        return DownloadUtils.downAsyncFile(b, new DownloadUtils.DownloadCallBack() {
             @Override
             public void onResponse(PartCallBackBean bean) {
                 if (!useMultiThread) {
@@ -361,9 +399,13 @@ public class MercuryDownloader {
     }
 
     private void cancelFuture() {
-        if (future != null) {
-            future.cancel(true);
-            future = null;
+        ScheduledFuture progressFuture = progressFutureMap.get(url);
+        if (progressFuture != null) {
+            progressFuture.cancel(true);
+            progressFutureMap.remove(url);
         }
+        List<Future> futures = futuresMap.get(url);
+        if (futures != null) futures.clear();
+        futuresMap.remove(url);
     }
 }

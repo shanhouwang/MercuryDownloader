@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.Future;
 
 /**
  * Created by Devin on 17/4/27.
@@ -14,21 +15,11 @@ import java.net.URL;
 public class DownloadUtils {
 
     /**
-     * 下载文件
-     *
-     * @param bean     参数包装类
-     * @param callBack 回调
-     */
-    public static void downAsyncFile(final DownAsyncFileBean bean, final DownloadCallBack callBack) {
-        request(bean, callBack);
-    }
-
-    /**
      * @param requestBean 请求参数封装
      * @param callBack    回调
      */
-    private static void request(final DownAsyncFileBean requestBean, final DownloadCallBack callBack) {
-        ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
+    public static Future downAsyncFile(final DownAsyncFileBean requestBean, final DownloadCallBack callBack) {
+        return ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;
@@ -91,12 +82,11 @@ public class DownloadUtils {
     /**
      * 获取线上File大小
      *
-     * @param path 路径
+     * @param path     路径
      * @param callBack 回调
      */
-    public static void getAsyncFileLength(final String path, final DownloadCallBack callBack) {
-
-        ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
+    public static Future getAsyncFileLength(final String path, final DownloadCallBack callBack) {
+        return ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;

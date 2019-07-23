@@ -2,6 +2,7 @@ package com.devin.downloader;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -69,13 +70,13 @@ public class ThreadUtils {
         return service;
     }
 
-    public void start(MercuryRunnable runnable) {
+    public Future start(MercuryRunnable runnable) {
         runnable.setCallBack(callBack);
-        build().execute(runnable);
+        return build().submit(runnable);
     }
 
-    public void start(Runnable runnable) {
-        build().execute(runnable);
+    public Future start(Runnable runnable) {
+        return build().submit(runnable);
     }
 
     /**
