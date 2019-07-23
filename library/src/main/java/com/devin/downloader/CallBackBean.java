@@ -26,4 +26,14 @@ public class CallBackBean implements Serializable {
      * 每次更新进度
      */
     public long progressLength;
+
+    @Override
+    public String toString() {
+        return "CallBackBean{" +
+                "path='" + path + '\'' +
+                ", isNeedProgress=" + isNeedProgress +
+                ", contentLength=" + contentLength +
+                ", progressLength=" + progressLength +
+                '}';
+    }
 }

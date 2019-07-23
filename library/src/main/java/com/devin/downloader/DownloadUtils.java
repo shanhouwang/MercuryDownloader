@@ -1,16 +1,10 @@
 package com.devin.downloader;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.List;
-
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.Request;
-import okhttp3.Response;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 /**
  * Created by Devin on 17/4/27.
@@ -26,66 +20,69 @@ public class DownloadUtils {
      * @param callBack 回调
      */
     public static void downAsyncFile(final DownAsyncFileBean bean, final DownloadCallBack callBack) {
-        Request request;
-        if (null != bean.breakPoint && bean.breakPoint.endPoint != 0) {
-            request = new Request.Builder()
-                    .addHeader("RANGE", "bytes=" + bean.breakPoint.startPoint + "-" + bean.breakPoint.endPoint)
-                    .url(bean.url)
-                    .tag(bean.tag)
-                    .build();
-        } else {
-            request = new Request.Builder()
-                    .url(bean.url)
-                    .tag(bean.tag)
-                    .build();
-        }
-        request(bean, callBack, request);
+        request(bean, callBack);
     }
 
-    private static void request(final DownAsyncFileBean data, final DownloadCallBack callBack, Request request) {
-
-        MercuryDownloader.mOkHttpClient.newCall(request).enqueue(new Callback() {
+    /**
+     * @param requestBean 请求参数封装
+     * @param callBack    回调
+     */
+    private static void request(final DownAsyncFileBean requestBean, final DownloadCallBack callBack) {
+        ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
             @Override
-            public void onFailure(Call call, IOException e) {
-                if (callBack != null) {
-                    callBack.onResponse(null);
-                }
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                assert response.body() != null;
-                InputStream inputStream = response.body().byteStream();
-                long contentLength = null != data.breakPoint ? data.breakPoint.contentLength : response.body().contentLength();
-                RandomAccessFile randomAccessFile;
-                String localPath = getLocalFilePath(data.fileName);
-                PartCallBackBean bean = null;
+            public void run() {
+                HttpURLConnection conn = null;
                 try {
-                    randomAccessFile = new RandomAccessFile(localPath, "rwd");
-                    if (null != data.breakPoint) {
-                        // 设置从什么位置开始写入数据
-                        randomAccessFile.seek(data.breakPoint.startPoint);
+                    URL url = new URL(requestBean.url);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(15 * 1000);
+                    conn.setReadTimeout(15 * 1000);
+                    conn.setRequestMethod("GET");
+                    if (null != requestBean.breakPoint) {
+                        conn.setRequestProperty("Range", "bytes=" + requestBean.breakPoint.startPoint + "-" + requestBean.breakPoint.endPoint);
                     }
-                    byte[] buffer = new byte[1024];
-                    int len;
-                    int progressLength = 0;
-                    while ((len = inputStream.read(buffer)) != -1) {
-                        randomAccessFile.write(buffer, 0, len);
-                        progressLength += len;
-                        if (callBack != null) {
-                            bean = new PartCallBackBean();
-                            bean.path = localPath;
-                            bean.isNeedProgress = data.progress;
-                            bean.contentLength = contentLength;
-                            bean.progressLength = progressLength;
-                            callBack.onResponse(bean);
+                    int responseCode = conn.getResponseCode();
+                    LogUtils.d(">>>>>request, responseCode: " + responseCode);
+                    if (responseCode == HttpURLConnection.HTTP_PARTIAL || responseCode == HttpURLConnection.HTTP_OK) {
+                        // 文件大小（可能是一部分）
+                        long contentLength = conn.getContentLength();
+                        String localPath = getLocalFilePath(requestBean.fileName);
+                        PartCallBackBean bean = null;
+                        RandomAccessFile randomAccessFile = new RandomAccessFile(localPath, "rwd");
+                        if (null != requestBean.breakPoint) {
+                            // 设置从什么位置开始写入数据
+                            randomAccessFile.seek(requestBean.breakPoint.startPoint);
+                        }
+                        InputStream inputStream = conn.getInputStream();
+                        byte[] buffer = new byte[1024 * 1024];
+                        int len;
+                        int progressLength = 0;
+                        while ((len = inputStream.read(buffer, 0, buffer.length)) != -1) {
+                            randomAccessFile.write(buffer, 0, len);
+                            progressLength += len;
+                            if (callBack != null) {
+                                bean = new PartCallBackBean();
+                                if (null != requestBean.breakPoint) {
+                                    bean.index = requestBean.breakPoint.index;
+                                    bean.startPoint = requestBean.breakPoint.startPoint;
+                                    bean.endPoint = requestBean.breakPoint.endPoint;
+                                }
+                                bean.path = localPath;
+                                bean.isNeedProgress = requestBean.progress;
+                                bean.contentLength = contentLength;
+                                bean.progressLength = progressLength;
+                                callBack.onResponse(bean);
+                            }
                         }
                         assert bean != null;
-                        LogUtils.d(">>>>>breakPoint: " + Thread.currentThread().getId() + ", " + data.breakPoint.toString());
-                        LogUtils.d(">>>>>" + Thread.currentThread().getId() + ", " + bean.toString());
+                        LogUtils.d(">>>>>request, callBack: " + Thread.currentThread().getId() + ", " + bean.toString());
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
+                } finally {
+                    if (null != conn) {
+                        conn.disconnect();
+                    }
                 }
             }
         });
@@ -94,27 +91,38 @@ public class DownloadUtils {
     /**
      * 获取线上File大小
      *
-     * @param url
-     * @param callBack
+     * @param path 路径
+     * @param callBack 回调
      */
-    public static void getAsyncFileLength(final String url, final DownloadCallBack callBack) {
-        Request request = new Request.Builder().url(url).build();
-        MercuryDownloader.mOkHttpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                if (callBack != null) {
-                    callBack.onResponse(null);
-                }
-            }
+    public static void getAsyncFileLength(final String path, final DownloadCallBack callBack) {
 
+        ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                if (callBack != null) {
-                    PartCallBackBean bean = new PartCallBackBean();
-                    bean.path = getLocalFilePath(url);
-                    assert response.body() != null;
-                    bean.contentLength = response.body().contentLength();
-                    callBack.onResponse(bean);
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    URL url = new URL(path);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(15 * 1000);
+                    conn.setReadTimeout(15 * 1000);
+                    conn.setRequestMethod("GET");
+                    int responseCode = conn.getResponseCode();
+                    LogUtils.d(">>>>>request, responseCode: " + responseCode);
+                    if (responseCode == HttpURLConnection.HTTP_PARTIAL || responseCode == HttpURLConnection.HTTP_OK) {
+                        long contentLength = conn.getContentLength();
+                        PartCallBackBean bean = new PartCallBackBean();
+                        bean.contentLength = contentLength;
+                        callBack.onResponse(bean);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    if (callBack != null) {
+                        callBack.onResponse(null);
+                    }
+                } finally {
+                    if (null != conn) {
+                        conn.disconnect();
+                    }
                 }
             }
         });

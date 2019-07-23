@@ -96,7 +96,6 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                         }))
                         .start();
             } else if (model.downloadStatus == AppInfoDTO.DOWNLOADING) {
-                MercuryDownloader.pause(model.downloadUrl);
                 model.downloadStatus = AppInfoDTO.PAUSE_DOWNLOAD;
                 notifyItemChanged(position);
             } else if (model.downloadStatus == AppInfoDTO.DOWNLOADED) {

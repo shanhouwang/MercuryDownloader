@@ -10,14 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.OkHttpClient;
-
 /**
  * @author Devin
  */
 public class MainActivity extends AppCompatActivity {
-
-    public static OkHttpClient mOkHttpClient;
 
     private MarsRefreshView marsRefreshView;
     private AppListAdapter adapter;
@@ -27,12 +23,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mOkHttpClient = new OkHttpClient.Builder()
-                .connectTimeout(30000L, TimeUnit.MILLISECONDS)
-                .readTimeout(30000L, TimeUnit.MILLISECONDS)
-                // .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
-                .build();
-        MercuryDownloader.init(this, mOkHttpClient);
+        MercuryDownloader.init(this);
 
         marsRefreshView = findViewById(R.id.marsRefreshView);
         marsRefreshView
@@ -85,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                             appInfoDTO.downloadUrl = "http://imtt.dd.qq.com/16891/F85076B8EA32D933089CEA797CF38C30.apk";
                             if (i == 1) {
                                 appInfoDTO.packageName = "com.tencent.qqlive";
-                                appInfoDTO.downloadUrl = "http://imtt.dd.qq.com/16891/110A36BF492C6672528F40A4FFDB22B4.apk";
+                                appInfoDTO.downloadUrl = "http://tqmall-image.s3.cn-north-1.jcloudcs.com/download/tqmall.apk";
                             }
                             if (i == 2) {
                                 appInfoDTO.packageName = "com.cleanmaster.mguard_cn";

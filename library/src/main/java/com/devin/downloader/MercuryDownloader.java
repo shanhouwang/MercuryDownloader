@@ -7,12 +7,12 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
-import android.util.SparseArray;
 
 import java.io.File;
-
-import okhttp3.Call;
-import okhttp3.OkHttpClient;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Devin on 2018/1/29.
@@ -21,17 +21,19 @@ import okhttp3.OkHttpClient;
  */
 public class MercuryDownloader {
 
-    private static final int NUM_THREADS = 5;
+    // 参数初始化
+    private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
 
-    private static final int NUM_DEFAULT_THREAD = 1;
+    // 核心线程数量
+    private static final int NUM_THREADS = Math.max(2, Math.min(CPU_COUNT - 1, 4));
 
-    private volatile SparseArray<PartCallBackBean> progressArray = new SparseArray<>();
+    private static final int DEFAULT_NUM_THREAD = 1;
+
+    private Map<Integer, PartCallBackBean> progressMap = new Hashtable<>();
 
     public static Context mContext;
 
     private Activity mActivity;
-
-    public static OkHttpClient mOkHttpClient;
 
     private String url;
 
@@ -61,9 +63,13 @@ public class MercuryDownloader {
     // 是否使用多线程
     private boolean useMultiThread = false;
 
-    public static void init(Context context, OkHttpClient client) {
+    // 定时任务，定时刷新Ui
+    private ScheduledFuture future;
+
+    private CallBackBean mCallBackBean = new CallBackBean();
+
+    public static void init(Context context) {
         mContext = context;
-        mOkHttpClient = client;
         Utils.init(context);
         sp = new SPUtils("downloader.sp");
     }
@@ -116,75 +122,11 @@ public class MercuryDownloader {
             @Override
             public void onActivityDestroyed(Activity activity) {
                 if (mActivity == activity) {
-                    cancel();
                     activity.getApplication().unregisterActivityLifecycleCallbacks(this);
                 }
             }
         });
         return this;
-    }
-
-    /**
-     * cancel download request
-     */
-    private void cancel() {
-
-        if (TextUtils.isEmpty(tag)) {
-            return;
-        }
-
-        String tagWipeOffUrl = tag.substring(0, tag.lastIndexOf("|"));
-
-        for (Call call : mOkHttpClient.dispatcher().runningCalls()) {
-            String tag = call.request().tag().toString();
-            String requestTagWipeOffUrl = tag.substring(0, tag.lastIndexOf("|"));
-            if (TextUtils.equals(tagWipeOffUrl, requestTagWipeOffUrl)) {
-                call.cancel();
-            }
-        }
-
-        for (Call call : mOkHttpClient.dispatcher().queuedCalls()) {
-            String tag = call.request().tag().toString();
-            String requestTagWipeOffUrl = tag.substring(0, tag.lastIndexOf("|"));
-            if (TextUtils.equals(tagWipeOffUrl, requestTagWipeOffUrl)) {
-                call.cancel();
-            }
-        }
-    }
-
-    /**
-     * pause download request
-     *
-     * @param url
-     */
-    public static void pause(String url) {
-
-        if (TextUtils.isEmpty(url)) {
-            return;
-        }
-
-        boolean pause = false;
-
-        for (Call call : mOkHttpClient.dispatcher().runningCalls()) {
-            String tag = call.request().tag().toString();
-            String requestUrl = tag.substring(tag.lastIndexOf("|") + 1);
-            if (TextUtils.equals(url, requestUrl)) {
-                call.cancel();
-                pause = true;
-            }
-        }
-
-        if (pause) {
-            return;
-        }
-
-        for (Call call : mOkHttpClient.dispatcher().queuedCalls()) {
-            String tag = call.request().tag().toString();
-            String requestUrl = tag.substring(tag.lastIndexOf("|") + 1);
-            if (TextUtils.equals(url, requestUrl)) {
-                call.cancel();
-            }
-        }
     }
 
     public MercuryDownloader useMultiThread(boolean useMultiThread) {
@@ -319,7 +261,7 @@ public class MercuryDownloader {
     }
 
     private void doIt(final String url, final String fileName) {
-        SparseArray<PartCallBackBean> parts = sp.getObject(url);
+        Map<Integer, PartCallBackBean> parts = sp.getObject(url);
         if (useCache) {
             if (parts != null) {
                 PartCallBackBean part = parts.get(0);
@@ -331,15 +273,16 @@ public class MercuryDownloader {
         } else {
             parts = null;
         }
-        final SparseArray<PartCallBackBean> catchParts = parts;
+        final Map<Integer, PartCallBackBean> catchParts = parts;
         if (useMultiThread) {
             DownloadUtils.getAsyncFileLength(url, new DownloadUtils.DownloadCallBack() {
                 @Override
                 public void onResponse(PartCallBackBean bean) {
                     if (bean != null) {
+                        mCallBackBean.contentLength = bean.contentLength;
                         long blockSize = bean.contentLength / NUM_THREADS;
                         for (int i = 0; i < NUM_THREADS; i++) {
-                            long endPoint = (i + 1) != NUM_THREADS ? (i + 1) * blockSize : bean.contentLength;
+                            long endPoint = (i + 1) != NUM_THREADS ? (i + 1) * blockSize - 1 : bean.contentLength;
                             PartCallBackBean part;
                             if (catchParts == null || catchParts.get(i) == null) {
                                 part = new PartCallBackBean();
@@ -357,10 +300,18 @@ public class MercuryDownloader {
         } else {
             async(catchParts == null ? null : catchParts.get(0), url, fileName);
         }
+
+        future = ThreadUtils.get(ThreadUtils.Type.SCHEDULED)
+                .scheduleWithFixedDelay(new Runnable() {
+                    @Override
+                    public void run() {
+                        map();
+                    }
+                }, 0, 1000, TimeUnit.MILLISECONDS);
     }
 
     private void async(PartCallBackBean bean, String url, String fileName) {
-        DownAsyncFileBean b = new DownAsyncFileBean();
+        final DownAsyncFileBean b = new DownAsyncFileBean();
         b.url = url;
         b.tag = tag;
         b.fileName = fileName;
@@ -368,40 +319,51 @@ public class MercuryDownloader {
         b.breakPoint = bean;
         b.contentLength = bean == null ? 0 : bean.contentLength;
         DownloadUtils.downAsyncFile(b, new DownloadUtils.DownloadCallBack() {
-
             @Override
             public void onResponse(PartCallBackBean bean) {
-                map(bean);
+                if (!useMultiThread) {
+                    mCallBackBean.contentLength = bean.contentLength;
+                }
+                progressMap.put(bean.index, bean);
             }
         });
     }
 
-    private void map(PartCallBackBean partBean) {
-        progressArray.put(partBean.index, partBean);
-        CallBackBean backBean = new CallBackBean();
-        backBean.path = partBean.path;
-        backBean.contentLength = partBean.contentLength;
-        for (int i = 0; i < (useMultiThread ? NUM_THREADS : NUM_DEFAULT_THREAD); i++) {
-            PartCallBackBean temp = progressArray.get(i);
+    private void map() {
+        mCallBackBean.progressLength = 0;
+        for (int i = 0; i < (useMultiThread ? NUM_THREADS : DEFAULT_NUM_THREAD); i++) {
+            PartCallBackBean temp = progressMap.get(i);
             if (temp == null) {
                 continue;
             }
-            backBean.progressLength += temp.progressLength;
+            mCallBackBean.path = temp.path;
+            mCallBackBean.progressLength += temp.progressLength;
         }
         // 下载完成
-        if (null != mOnDownloaderListener && backBean.contentLength == backBean.progressLength) {
-            mOnDownloaderListener.onComplete(backBean);
-            sp.putString(MercuryDownloader.this.fileName, backBean.path);
-            sp.putObject(url, progressArray);
+        if (null != mOnDownloaderListener && mCallBackBean.contentLength != 0 && mCallBackBean.contentLength == mCallBackBean.progressLength) {
+            mOnDownloaderListener.onComplete(mCallBackBean);
+            sp.putString(MercuryDownloader.this.fileName, mCallBackBean.path);
+            sp.putObject(url, progressMap);
+            cancelFuture();
         }
         // 正在下载
-        if (null != mOnProgressListener && backBean.contentLength >= backBean.progressLength) {
-            mOnProgressListener.onProgress(backBean);
-            sp.putObject(url, progressArray);
+        if (null != mOnProgressListener && mCallBackBean.progressLength != 0 && mCallBackBean.contentLength >= mCallBackBean.progressLength) {
+            mOnProgressListener.onProgress(mCallBackBean);
+            sp.putObject(url, progressMap);
+            LogUtils.d(">>>>>map: " + mCallBackBean.toString());
         }
+        LogUtils.d(">>>>>map, out: " + mCallBackBean.toString());
         // 出现错误
-        if (null == backBean && null != mOnErrorListener) {
+        if (null == mCallBackBean && null != mOnErrorListener) {
             mOnErrorListener.onError();
+            cancelFuture();
+        }
+    }
+
+    private void cancelFuture() {
+        if (future != null) {
+            future.cancel(true);
+            future = null;
         }
     }
 }

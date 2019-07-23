@@ -31,5 +31,4 @@ dependencies {
     implementation 'com.android.support:recyclerview-v7:26.1.0'
     implementation 'com.devin:mars-refresh:0.0.5-beta-2'
     implementation 'com.squareup.okhttp3:okhttp:3.9.0'
-    implementation 'com.readystatesoftware.chuck:library:1.1.0'
 }

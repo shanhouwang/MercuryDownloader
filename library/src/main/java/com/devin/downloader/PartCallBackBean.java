@@ -18,7 +18,7 @@ public class PartCallBackBean implements Serializable {
     public boolean isNeedProgress;
 
     /**
-     * 整体文件大小
+     * 文件大小
      */
     public long contentLength;
 
@@ -30,7 +30,7 @@ public class PartCallBackBean implements Serializable {
     /**
      * 开始位置
      */
-    public long startPoint;
+    public long startPoint = 0;
 
     /**
      * 结束位置
