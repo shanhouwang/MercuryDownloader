@@ -74,9 +74,9 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
                 holder.layout_progressbar.setVisibility(View.VISIBLE);
                 MercuryDownloader.build()
                         .url(model.downloadUrl)
-                        .useCache(false)
+                        .useCache(true)
                         .activity(context)
-                        .useMultiThread(true)
+                        .useMultiThread(false)
                         .setOnCancelListener(() -> {
                             model.downloadStatus = AppInfoDTO.PREPARE_DOWNLOAD;
                             notifyItemChanged(position, R.id.tv_progress);
@@ -108,7 +108,6 @@ public class AppListAdapter extends RecyclerView.Adapter<AppListAdapter.ViewHold
         holder.tv_size.setText(model.appSize + "M");
         holder.tv_app_desc.setText(model.appDesc);
         setStatus(model, holder);
-
         if (position % DIVISOR == 0) {
             holder.itemView.setBackgroundColor(context.getResources().getColor(R.color._ffffff));
         } else {

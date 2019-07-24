@@ -33,7 +33,7 @@ publish {
     userOrg = 'shanhouwang'
     groupId = 'com.devin'
     artifactId = 'downloader'
-    publishVersion = '1.0.0-eta'
+    publishVersion = '1.0.0-omega'
     desc = 'a android breakpoint downloader'
     website = 'https://github.com/shanhouwang/MercuryDownloader'
 }

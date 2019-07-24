@@ -1,7 +1,6 @@
 package com.devin.downloader;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -12,7 +11,7 @@ import static java.util.concurrent.Executors.*;
 /**
  * Created by Devin on 17/3/15.
  */
-public class ThreadUtils {
+public class ExecutorServiceUtils {
 
     private static ExecutorService mCachedThreadPool;
     private static ScheduledExecutorService mScheduledThreadPool;
@@ -21,11 +20,11 @@ public class ThreadUtils {
     private Type type;
     private CallBack callBack;
 
-    private ThreadUtils() {
+    private ExecutorServiceUtils() {
     }
 
-    public static ThreadUtils get(Type type) {
-        ThreadUtils util = new ThreadUtils();
+    public static ExecutorServiceUtils get(Type type) {
+        ExecutorServiceUtils util = new ExecutorServiceUtils();
         util.type = type;
         return util;
     }
@@ -105,7 +104,7 @@ public class ThreadUtils {
         return mScheduledThreadPool.schedule(runnable, delay, unit);
     }
 
-    public ThreadUtils callBack(CallBack callBack) {
+    public ExecutorServiceUtils callBack(CallBack callBack) {
         this.callBack = callBack;
         return this;
     }

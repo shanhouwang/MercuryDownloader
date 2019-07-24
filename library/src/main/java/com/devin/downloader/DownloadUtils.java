@@ -19,7 +19,7 @@ public class DownloadUtils {
      * @param callBack    回调
      */
     public static Future downAsyncFile(final DownAsyncFileBean requestBean, final DownloadCallBack callBack) {
-        return ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
+        return ExecutorServiceUtils.get(ExecutorServiceUtils.Type.CACHED).start(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;
@@ -29,29 +29,33 @@ public class DownloadUtils {
                     conn.setConnectTimeout(15 * 1000);
                     conn.setReadTimeout(15 * 1000);
                     conn.setRequestMethod("GET");
+                    long seek = 0;
                     if (null != requestBean.breakPoint) {
-                        conn.setRequestProperty("Range", "bytes=" + requestBean.breakPoint.startPoint + "-" + requestBean.breakPoint.endPoint);
+                        seek = requestBean.breakPoint.startPoint + requestBean.breakPoint.progressLength;
+                        if (requestBean.breakPoint.endPoint == 0) {
+                            requestBean.breakPoint.endPoint = requestBean.contentLength;
+                        }
+                        conn.setRequestProperty("Range", "bytes=" + seek + "-" + requestBean.breakPoint.endPoint);
                     }
                     int responseCode = conn.getResponseCode();
                     LogUtils.d(">>>>>request, responseCode: " + responseCode);
                     if (responseCode == HttpURLConnection.HTTP_PARTIAL || responseCode == HttpURLConnection.HTTP_OK) {
-                        // 文件大小（可能是一部分）
-                        long contentLength = conn.getContentLength();
                         String localPath = getLocalFilePath(requestBean.fileName);
                         PartCallBackBean bean = null;
                         RandomAccessFile randomAccessFile = new RandomAccessFile(localPath, "rwd");
+                        long totalLength = 0;
                         if (null != requestBean.breakPoint) {
                             // 设置从什么位置开始写入数据
-                            randomAccessFile.seek(requestBean.breakPoint.startPoint);
+                            randomAccessFile.seek(seek);
+                            totalLength = requestBean.breakPoint.progressLength;
                         }
                         InputStream inputStream = conn.getInputStream();
-                        byte[] buffer = new byte[1024 * 1024];
-                        int len;
-                        int progressLength = 0;
-                        while ((len = inputStream.read(buffer, 0, buffer.length)) != -1) {
-                            randomAccessFile.write(buffer, 0, len);
-                            progressLength += len;
-                            LogUtils.d(">>>>>request, write: " + Thread.currentThread().getName() + ", length: " + len);
+                        byte[] buffer = new byte[16 * 1024];
+                        int length;
+                        while ((length = inputStream.read(buffer)) != -1) {
+                            randomAccessFile.write(buffer, 0, length);
+                            LogUtils.d(">>>>>request, while: " + Thread.currentThread().getName() + ", write length: " + length + ", catche: " + totalLength + ", contentLength: " + requestBean.contentLength);
+                            totalLength += length;
                             if (callBack != null) {
                                 bean = new PartCallBackBean();
                                 if (null != requestBean.breakPoint) {
@@ -61,8 +65,7 @@ public class DownloadUtils {
                                 }
                                 bean.path = localPath;
                                 bean.isNeedProgress = requestBean.progress;
-                                bean.contentLength = contentLength;
-                                bean.progressLength = progressLength;
+                                bean.progressLength = totalLength;
                                 callBack.onResponse(bean);
                             }
                         }
@@ -71,6 +74,7 @@ public class DownloadUtils {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    callBack.onFailure(e);
                 } finally {
                     if (null != conn) {
                         conn.disconnect();
@@ -87,7 +91,7 @@ public class DownloadUtils {
      * @param callBack 回调
      */
     public static Future getAsyncFileLength(final String path, final DownloadCallBack callBack) {
-        return ThreadUtils.get(ThreadUtils.Type.CACHED).start(new Runnable() {
+        return ExecutorServiceUtils.get(ExecutorServiceUtils.Type.CACHED).start(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;
@@ -137,6 +141,8 @@ public class DownloadUtils {
          * @param bean
          */
         void onResponse(PartCallBackBean bean);
+
+        void onFailure(Exception e);
     }
 
 }
