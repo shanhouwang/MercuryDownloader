@@ -388,9 +388,8 @@ public class MercuryDownloader {
         if (null != mOnProgressListener && mCallBackBean.progressLength != 0 && mCallBackBean.contentLength >= mCallBackBean.progressLength) {
             mOnProgressListener.onProgress(mCallBackBean);
             sp.putObject(url, progressMap);
-            LogUtils.d(">>>>>map: " + mCallBackBean.toString());
         }
-        LogUtils.d(">>>>>map, out: " + mCallBackBean.toString());
+        LogUtils.d(">>>>>map: " + mCallBackBean.toString());
         // 出现错误
         if (null == mCallBackBean && null != mOnErrorListener) {
             mOnErrorListener.onError();

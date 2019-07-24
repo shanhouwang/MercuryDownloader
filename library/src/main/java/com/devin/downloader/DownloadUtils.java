@@ -51,6 +51,7 @@ public class DownloadUtils {
                         while ((len = inputStream.read(buffer, 0, buffer.length)) != -1) {
                             randomAccessFile.write(buffer, 0, len);
                             progressLength += len;
+                            LogUtils.d(">>>>>request, write: " + Thread.currentThread().getName() + ", length: " + len);
                             if (callBack != null) {
                                 bean = new PartCallBackBean();
                                 if (null != requestBean.breakPoint) {
